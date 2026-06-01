@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: tiffin_postgres
+    environment:
+      POSTGRES_DB: tiffin_marketplace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: tiffin_backend
+    env_file:
+      - ./backend/.env.example
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+
+  customer-web:
+    build: ./customer-web
+    container_name: tiffin_customer_web
+    env_file:
+      - ./customer-web/.env.local.example
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./customer-web:/app
+      - /app/node_modules
+
+  merchant-admin:
+    build: ./merchant-admin
+    container_name: tiffin_merchant_admin
+    env_file:
+      - ./merchant-admin/.env.example
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    volumes:
+      - ./merchant-admin:/app
+
+volumes:
+  postgres_data:
