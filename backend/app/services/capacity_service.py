@@ -4,6 +4,8 @@ from sqlalchemy import select
 
 from app.models.slot_capacity import SlotCapacity
 
+DEFAULT_SLOT_CAPACITY = 20
+
 
 def reserve_slot_capacity(db: Session, business_id: str, service_date, slot_type: str, quantity: int) -> None:
     stmt = (
@@ -17,7 +19,17 @@ def reserve_slot_capacity(db: Session, business_id: str, service_date, slot_type
     )
     slot = db.execute(stmt).scalar_one_or_none()
     if not slot:
-        raise HTTPException(status_code=400, detail="Slot capacity not configured")
+        slot = SlotCapacity(
+            business_id=business_id,
+            service_date=service_date,
+            slot_type=slot_type,
+            total_capacity=DEFAULT_SLOT_CAPACITY,
+            reserved_capacity=0,
+            remaining_capacity=DEFAULT_SLOT_CAPACITY,
+            is_closed=False,
+        )
+        db.add(slot)
+        db.flush()
     if slot.is_closed or slot.remaining_capacity < quantity:
         raise HTTPException(status_code=400, detail="Selected slot is sold out")
 

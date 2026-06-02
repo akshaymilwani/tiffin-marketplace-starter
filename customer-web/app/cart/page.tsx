@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { getCustomerSession } from "../../lib/customerAuth";
 
 type CartItem = {
   menu_item_id: string;
@@ -26,8 +27,19 @@ function tomorrowDateString() {
   return date.toISOString().slice(0, 10);
 }
 
+function updateStoredCart(cart: Cart | null) {
+  if (cart) {
+    window.localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  } else {
+    window.localStorage.removeItem(CART_KEY);
+  }
+  window.dispatchEvent(new Event("cart-updated"));
+}
+
 export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [customerEmail, setCustomerEmail] = useState("");
   const [customerUserId, setCustomerUserId] = useState("");
   const [serviceDate, setServiceDate] = useState(tomorrowDateString());
   const [slotType, setSlotType] = useState("lunch");
@@ -37,63 +49,58 @@ export default function CartPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const session = getCustomerSession();
+    setCustomerEmail(session?.email || "");
+    setCustomerUserId(session?.user_id || "");
+
     const raw = window.localStorage.getItem(CART_KEY);
-    if (!raw) return;
+    if (!raw) {
+      setLoaded(true);
+      return;
+    }
 
     try {
       setCart(JSON.parse(raw));
     } catch {
-      window.localStorage.removeItem(CART_KEY);
+      updateStoredCart(null);
     }
+    setLoaded(true);
   }, []);
 
   const subtotal = useMemo(() => {
-    return (
-      cart?.items.reduce(
-        (sum, item) => sum + Number(item.unit_price || 0) * item.quantity,
-        0
-      ) || 0
-    );
+    return cart?.items.reduce((sum, item) => sum + Number(item.unit_price || 0) * item.quantity, 0) || 0;
   }, [cart]);
 
   function updateQuantity(menuItemId: string, quantity: number) {
-    if (!cart) return;
+    if (!cart || !Number.isFinite(quantity) || quantity < 1) return;
 
-    if (!Number.isFinite(quantity) || quantity < 1) {
-      return;
-    }
-
-    const updatedItems = cart.items.map((item) =>
-      item.menu_item_id === menuItemId ? { ...item, quantity } : item
-    );
-
-    const updatedCart = { ...cart, items: updatedItems };
+    const updatedCart = {
+      ...cart,
+      items: cart.items.map((item) => (item.menu_item_id === menuItemId ? { ...item, quantity } : item)),
+    };
 
     setCart(updatedCart);
-    window.localStorage.setItem(CART_KEY, JSON.stringify(updatedCart));
+    updateStoredCart(updatedCart);
   }
 
   function removeItem(menuItemId: string) {
     if (!cart) return;
 
-    const updatedItems = cart.items.filter(
-      (item) => item.menu_item_id !== menuItemId
-    );
-
+    const updatedItems = cart.items.filter((item) => item.menu_item_id !== menuItemId);
     if (updatedItems.length === 0) {
-      window.localStorage.removeItem(CART_KEY);
       setCart(null);
+      updateStoredCart(null);
       return;
     }
 
     const updatedCart = { ...cart, items: updatedItems };
     setCart(updatedCart);
-    window.localStorage.setItem(CART_KEY, JSON.stringify(updatedCart));
+    updateStoredCart(updatedCart);
   }
 
   function clearCart() {
-    window.localStorage.removeItem(CART_KEY);
     setCart(null);
+    updateStoredCart(null);
     setStatus("");
     setError("");
   }
@@ -107,15 +114,13 @@ export default function CartPage() {
       return;
     }
 
-    if (!customerUserId.trim()) {
-      setError(
-        "Please enter customer user_id. For now, create a customer in Swagger and paste the returned user_id here."
-      );
+    if (!customerUserId) {
+      setError("Please log in or create a customer account before placing an order.");
       return;
     }
 
     const payload = {
-      user_id: customerUserId.trim(),
+      user_id: customerUserId,
       business_id: cart.business_id,
       service_date: serviceDate,
       slot_type: slotType,
@@ -130,46 +135,42 @@ export default function CartPage() {
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || JSON.stringify(data));
 
-      if (!res.ok) {
-        throw new Error(data?.detail || JSON.stringify(data));
-      }
-
-      window.localStorage.removeItem(CART_KEY);
       setCart(null);
-      setStatus(
-        `Order created successfully. Order ID: ${
-          data.id || data.order_id || "created"
-        }`
-      );
+      updateStoredCart(null);
+      setStatus(`Order created successfully. Order ID: ${data.id || data.order_id || "created"}`);
     } catch (err: any) {
       setError(err?.message || "Failed to create order.");
     }
+  }
+
+  if (!loaded) {
+    return <div className="card">Loading cart...</div>;
+  }
+
+  if (!customerUserId) {
+    return (
+      <div className="card">
+        <h1>Your cart</h1>
+        <p>Please log in to view or use your cart.</p>
+        <Link href="/login" className="button">Login or create account</Link>
+      </div>
+    );
   }
 
   if (!cart || cart.items.length === 0) {
     return (
       <div className="grid" style={{ gap: 16 }}>
         <h1>Your cart</h1>
-
-        {status && (
-          <div className="card" style={{ color: "green" }}>
-            {status}
-          </div>
-        )}
-
+        {status && <div className="card" style={{ color: "green" }}>{status}</div>}
         <div className="card">Your cart is empty.</div>
-
-        <Link href="/kitchens" className="button">
-          Browse kitchens
-        </Link>
+        <Link href="/kitchens" className="button">Browse kitchens</Link>
       </div>
     );
   }
@@ -181,102 +182,53 @@ export default function CartPage() {
       <div className="card">
         <h2>{cart.business_name}</h2>
         <p className="muted">Ordering from one kitchen at a time for MVP.</p>
-        <Link href={`/kitchens/${cart.business_slug}`}>
-          ← Add more items from this kitchen
-        </Link>
+        <Link href={`/kitchens/${cart.business_slug}`}>Back to this kitchen</Link>
       </div>
 
       <div className="card">
         <h2>Items</h2>
-
         {cart.items.map((item) => (
-          <div
-            key={item.menu_item_id}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 120px 100px 90px",
-              gap: 12,
-              alignItems: "center",
-              borderBottom: "1px solid #eee",
-              padding: "8px 0",
-            }}
-          >
+          <div key={item.menu_item_id} className="cart-row">
             <div>
               <strong>{item.name}</strong>
-              <div className="muted">
-                ${Number(item.unit_price).toFixed(2)} each
-              </div>
+              <div className="muted">${Number(item.unit_price).toFixed(2)} each</div>
             </div>
-
             <input
               type="number"
               min={1}
               value={item.quantity}
-              onChange={(e) => {
-                const rawValue = e.target.value;
-
-                if (rawValue === "") {
-                  return;
-                }
-
-                const nextQuantity = Number(rawValue);
-
-                if (!Number.isFinite(nextQuantity) || nextQuantity < 1) {
-                  return;
-                }
-
-                updateQuantity(item.menu_item_id, nextQuantity);
-              }}
+              onChange={(e) => updateQuantity(item.menu_item_id, Number(e.target.value))}
             />
-
-            <strong>
-              ${(Number(item.unit_price) * item.quantity).toFixed(2)}
-            </strong>
-
-            <button type="button" onClick={() => removeItem(item.menu_item_id)}>
-              Remove
-            </button>
+            <strong>${(Number(item.unit_price) * item.quantity).toFixed(2)}</strong>
+            <button type="button" onClick={() => removeItem(item.menu_item_id)}>Remove</button>
           </div>
         ))}
-
         <h3>Subtotal: ${subtotal.toFixed(2)}</h3>
-
-        <button type="button" onClick={clearCart}>
-          Clear cart
-        </button>
+        <button type="button" onClick={clearCart}>Clear cart</button>
       </div>
 
       <div className="card">
         <h2>Order details</h2>
-
         <div className="grid" style={{ gap: 12 }}>
-          <label>
-            Customer User ID
-            <input
-              value={customerUserId}
-              onChange={(e) => setCustomerUserId(e.target.value)}
-              placeholder="Paste customer user_id from /auth/signup"
-              style={{ width: "100%" }}
-            />
-          </label>
+          {customerUserId ? (
+            <div className="card" style={{ background: "#f7fff9" }}>
+              Ordering as <strong>{customerEmail}</strong>
+            </div>
+          ) : (
+            <div className="card">
+              <p>Please log in before placing your order.</p>
+              <Link href="/login" className="button">Login or create account</Link>
+            </div>
+          )}
 
           <label>
             Service Date
-            <input
-              type="date"
-              value={serviceDate}
-              onChange={(e) => setServiceDate(e.target.value)}
-              style={{ width: "100%" }}
-            />
+            <input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} style={{ width: "100%" }} />
           </label>
 
           <label>
             Slot
-            <select
-              value={slotType}
-              onChange={(e) => setSlotType(e.target.value)}
-              style={{ width: "100%" }}
-            >
+            <select value={slotType} onChange={(e) => setSlotType(e.target.value)} style={{ width: "100%" }}>
               <option value="lunch">Lunch</option>
               <option value="dinner">Dinner</option>
             </select>
@@ -284,11 +236,7 @@ export default function CartPage() {
 
           <label>
             Fulfillment
-            <select
-              value={fulfillmentMode}
-              onChange={(e) => setFulfillmentMode(e.target.value)}
-              style={{ width: "100%" }}
-            >
+            <select value={fulfillmentMode} onChange={(e) => setFulfillmentMode(e.target.value)} style={{ width: "100%" }}>
               <option value="pickup">Pickup</option>
               <option value="self_delivery">Merchant Self Delivery</option>
             </select>
@@ -296,18 +244,10 @@ export default function CartPage() {
 
           <label>
             Notes
-            <textarea
-              value={customerNotes}
-              onChange={(e) => setCustomerNotes(e.target.value)}
-              placeholder="Any pickup/delivery notes?"
-              style={{ width: "100%" }}
-            />
+            <textarea value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} placeholder="Any pickup/delivery notes?" style={{ width: "100%" }} />
           </label>
 
-          <button className="button" type="button" onClick={placeOrder}>
-            Place order
-          </button>
-
+          <button className="button" type="button" onClick={placeOrder}>Place order</button>
           {status && <div style={{ color: "green" }}>{status}</div>}
           {error && <div style={{ color: "red" }}>Error: {error}</div>}
         </div>

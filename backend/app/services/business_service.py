@@ -7,6 +7,13 @@ from app.schemas.business import BusinessCreate
 
 
 def create_business(db: Session, owner_user_id: str, payload: BusinessCreate) -> Business:
+    existing_business = db.query(Business).filter(Business.owner_user_id == owner_user_id).first()
+    if existing_business:
+        raise HTTPException(
+            status_code=400,
+            detail="This merchant already has a business profile. Create a separate merchant login for another business.",
+        )
+
     base_slug = slugify(payload.business_name)
     slug = base_slug
     index = 1

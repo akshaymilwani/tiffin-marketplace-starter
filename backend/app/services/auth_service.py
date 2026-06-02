@@ -7,9 +7,17 @@ from app.schemas.auth import SignUpRequest, LoginRequest
 
 
 def signup(db: Session, payload: SignUpRequest):
+    if payload.role not in {"customer", "merchant", "admin"}:
+        raise HTTPException(status_code=400, detail="Role must be customer, merchant, or admin")
+
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    if payload.role == "admin":
+        existing_admin = db.query(User).filter(User.role == "admin", User.is_active.is_(True)).first()
+        if existing_admin:
+            raise HTTPException(status_code=403, detail="An admin user already exists. Log in as admin to manage the portal.")
 
     user = User(
         full_name=payload.full_name,
@@ -20,11 +28,11 @@ def signup(db: Session, payload: SignUpRequest):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return {"access_token": create_access_token(str(user.id)), "token_type": "bearer", "user_id": str(user.id)}
+    return {"access_token": create_access_token(str(user.id)), "token_type": "bearer", "user_id": str(user.id), "role": user.role}
 
 
 def login(db: Session, payload: LoginRequest):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"access_token": create_access_token(str(user.id)), "token_type": "bearer", "user_id": str(user.id)}
+    return {"access_token": create_access_token(str(user.id)), "token_type": "bearer", "user_id": str(user.id), "role": user.role}

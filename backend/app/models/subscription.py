@@ -11,6 +11,7 @@ class Subscription(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     business_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
     plan_tier: Mapped[str] = mapped_column(String(30), nullable=False)
+    payment_type: Mapped[str] = mapped_column(String(20), default="free", nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False)
     activated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     start_date: Mapped[date] = mapped_column(Date, nullable=False)

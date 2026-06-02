@@ -55,3 +55,33 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function GET(request: NextRequest) {
+  const userId = request.nextUrl.searchParams.get("user_id");
+
+  if (!userId) {
+    return NextResponse.json(
+      { detail: "user_id is required for order history" },
+      { status: 400 }
+    );
+  }
+
+  const backendRes = await fetch(`${API_BASE_URL}/orders`, {
+    method: "GET",
+    headers: {
+      "X-User-Id": userId,
+    },
+    cache: "no-store",
+  });
+
+  const text = await backendRes.text();
+
+  let data: any;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { detail: text };
+  }
+
+  return NextResponse.json(data, { status: backendRes.status });
+}

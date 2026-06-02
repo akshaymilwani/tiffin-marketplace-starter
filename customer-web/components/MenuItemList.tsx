@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getCustomerSession } from "../lib/customerAuth";
 
 type Kitchen = {
   id: string;
@@ -50,6 +51,7 @@ function readCart(): Cart | null {
 
 function writeCart(cart: Cart) {
   window.localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  window.dispatchEvent(new Event("cart-updated"));
 }
 
 export default function MenuItemList({
@@ -70,6 +72,12 @@ export default function MenuItemList({
 
   function addToCart(item: MenuItem) {
     setMessage("");
+
+    if (!getCustomerSession()?.user_id) {
+      setMessage("Please log in before adding items to your cart.");
+      window.setTimeout(() => setMessage(""), 3000);
+      return;
+    }
 
     const existingCart = readCart();
 
@@ -110,6 +118,7 @@ export default function MenuItemList({
     const count = cart.items.reduce((sum, x) => sum + x.quantity, 0);
     setCartCount(count);
     setMessage(`${item.name} added to cart.`);
+    window.setTimeout(() => setMessage(""), 2500);
   }
 
   if (!menuItems || menuItems.length === 0) {
@@ -118,7 +127,7 @@ export default function MenuItemList({
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      {message && <div style={{ color: "green" }}>{message}</div>}
+      {message && <div className="toast" role="status">{message}</div>}
 
       {cartCount > 0 && (
         <div>

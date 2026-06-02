@@ -13,6 +13,7 @@ class MenuItemCreate(BaseModel):
     prep_lead_time_hours: int = 0
     available_days: list[str] = []
     available_slots: list[str] = []
+    is_active: bool = True
 
 class MenuItemResponse(BaseModel):
     id: UUID

@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, Text, Numeric, Integer, ForeignKey
+from sqlalchemy import String, Boolean, DateTime, Text, Numeric, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 class Business(Base):
     __tablename__ = "businesses"
+    __table_args__ = (UniqueConstraint("owner_user_id", name="uq_business_owner_user_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
