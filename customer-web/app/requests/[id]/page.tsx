@@ -31,15 +31,18 @@ type RequestDetail = {
 };
 
 export default function RequestDetailPage({ params }: { params: { id: string } }) {
-  const [userId, setUserId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const [detail, setDetail] = useState<RequestDetail | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function loadDetail(resolvedUserId: string) {
+  async function loadDetail(token: string) {
     try {
-      const res = await fetch(`/api/requests/${params.id}?user_id=${encodeURIComponent(resolvedUserId)}`, { cache: "no-store" });
+      const res = await fetch(`/api/requests/${params.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.detail || "Failed to load request");
       setDetail(data);
@@ -52,12 +55,12 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     const session = getCustomerSession();
-    setUserId(session?.user_id || "");
-    if (!session?.user_id) {
+    setAccessToken(session?.access_token || "");
+    if (!session?.access_token) {
       setLoaded(true);
       return;
     }
-    loadDetail(session.user_id);
+    loadDetail(session.access_token);
   }, [params.id]);
 
   async function updateProposal(proposalId: string, status: "accepted" | "rejected") {
@@ -66,14 +69,14 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
     try {
       const res = await fetch(`/api/requests/${params.id}/proposals/${proposalId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, status }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ status }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.detail || "Failed to update proposal");
       setMessage(status === "accepted" ? "Proposal accepted." : "Proposal rejected.");
       window.setTimeout(() => setMessage(""), 2500);
-      await loadDetail(userId);
+      await loadDetail(accessToken);
     } catch (err: any) {
       setError(err?.message || "Failed to update proposal.");
     }
@@ -81,7 +84,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
 
   if (!loaded) return <div className="card">Loading request...</div>;
 
-  if (!userId) {
+  if (!accessToken) {
     return (
       <div className="card">
         <h1>Request detail</h1>

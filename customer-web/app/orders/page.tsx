@@ -13,6 +13,7 @@ type OrderItem = {
 type Order = {
   id: string;
   order_number: string;
+  business_id: string;
   status: string;
   service_date: string;
   slot_type: string;
@@ -30,19 +31,27 @@ export default function OrdersPage() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [reviewRating, setReviewRating] = useState<Record<string, number>>({});
+  const [reviewText, setReviewText] = useState<Record<string, string>>({});
+  const [reviewStatus, setReviewStatus] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function loadOrders() {
       const session = getCustomerSession();
       setEmail(session?.email || "");
+      setAccessToken(session?.access_token || "");
 
-      if (!session?.user_id) {
+      if (!session?.access_token) {
         setLoaded(true);
         return;
       }
 
       try {
-        const res = await fetch(`/api/orders?user_id=${encodeURIComponent(session.user_id)}`, { cache: "no-store" });
+        const res = await fetch("/api/orders", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: "no-store",
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || "Failed to load orders");
         setOrders(Array.isArray(data) ? data : []);
@@ -58,6 +67,37 @@ export default function OrdersPage() {
 
   const currentOrders = useMemo(() => orders.filter((order) => !PAST_STATUSES.has(order.status)), [orders]);
   const pastOrders = useMemo(() => orders.filter((order) => PAST_STATUSES.has(order.status)), [orders]);
+
+  async function submitReview(order: Order) {
+    const rating = Number(reviewRating[order.id] || 0);
+    const text = reviewText[order.id] || "";
+
+    if (!accessToken) {
+      setReviewStatus((current) => ({ ...current, [order.id]: "Please log in before submitting a review." }));
+      return;
+    }
+    if (rating < 1 || rating > 5) {
+      setReviewStatus((current) => ({ ...current, [order.id]: "Choose a rating from 1 to 5." }));
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          preorder_id: order.id,
+          rating,
+          review_text: text,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.detail || "Failed to submit review");
+      setReviewStatus((current) => ({ ...current, [order.id]: "Review saved." }));
+    } catch (err: any) {
+      setReviewStatus((current) => ({ ...current, [order.id]: err?.message || "Failed to submit review." }));
+    }
+  }
 
   function renderOrders(list: Order[]) {
     if (list.length === 0) return <div className="card">No orders found.</div>;
@@ -82,6 +122,41 @@ export default function OrdersPage() {
               ))}
             </ul>
             {order.merchant_notes && <p className="muted">Merchant notes: {order.merchant_notes}</p>}
+            {order.status === "fulfilled" && (
+              <div className="review-form">
+                <label>
+                  Rating
+                  <select
+                    value={reviewRating[order.id] || ""}
+                    onChange={(event) =>
+                      setReviewRating((current) => ({ ...current, [order.id]: Number(event.target.value) }))
+                    }
+                    style={{ width: "100%" }}
+                  >
+                    <option value="">Select</option>
+                    <option value="5">5 stars</option>
+                    <option value="4">4 stars</option>
+                    <option value="3">3 stars</option>
+                    <option value="2">2 stars</option>
+                    <option value="1">1 star</option>
+                  </select>
+                </label>
+                <label>
+                  Review
+                  <textarea
+                    value={reviewText[order.id] || ""}
+                    onChange={(event) => setReviewText((current) => ({ ...current, [order.id]: event.target.value }))}
+                    placeholder="Share your experience"
+                    rows={2}
+                    style={{ width: "100%" }}
+                  />
+                </label>
+                <button className="button" type="button" onClick={() => submitReview(order)}>
+                  Submit review
+                </button>
+                {reviewStatus[order.id] && <div className="muted">{reviewStatus[order.id]}</div>}
+              </div>
+            )}
           </div>
         ))}
       </div>

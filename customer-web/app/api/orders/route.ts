@@ -6,12 +6,12 @@ const API_BASE_URL =
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const authorization = request.headers.get("authorization");
 
-    const userId = body.user_id;
-    if (!userId) {
+    if (!authorization) {
       return NextResponse.json(
-        { detail: "user_id is required for starter ordering auth" },
-        { status: 400 }
+        { detail: "Authentication required" },
+        { status: 401 }
       );
     }
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": userId,
+        Authorization: authorization,
       },
       body: JSON.stringify(payload),
       cache: "no-store",
@@ -57,19 +57,19 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get("user_id");
+  const authorization = request.headers.get("authorization");
 
-  if (!userId) {
+  if (!authorization) {
     return NextResponse.json(
-      { detail: "user_id is required for order history" },
-      { status: 400 }
+      { detail: "Authentication required" },
+      { status: 401 }
     );
   }
 
   const backendRes = await fetch(`${API_BASE_URL}/orders`, {
     method: "GET",
     headers: {
-      "X-User-Id": userId,
+      Authorization: authorization,
     },
     cache: "no-store",
   });

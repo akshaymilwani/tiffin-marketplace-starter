@@ -23,8 +23,12 @@ class BusinessResponse(BaseModel):
     business_name: str
     slug: str
     cuisine_type: str
+    city: str
+    province: str
     verification_status: str
     public_listing_status: str
+    avg_rating: float | None = None
+    total_reviews: int = 0
 
     class Config:
         from_attributes = True

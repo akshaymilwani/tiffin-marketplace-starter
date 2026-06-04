@@ -40,7 +40,7 @@ export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
-  const [customerUserId, setCustomerUserId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const [serviceDate, setServiceDate] = useState(tomorrowDateString());
   const [slotType, setSlotType] = useState("lunch");
   const [fulfillmentMode, setFulfillmentMode] = useState("pickup");
@@ -51,7 +51,7 @@ export default function CartPage() {
   useEffect(() => {
     const session = getCustomerSession();
     setCustomerEmail(session?.email || "");
-    setCustomerUserId(session?.user_id || "");
+    setAccessToken(session?.access_token || "");
 
     const raw = window.localStorage.getItem(CART_KEY);
     if (!raw) {
@@ -114,13 +114,12 @@ export default function CartPage() {
       return;
     }
 
-    if (!customerUserId) {
+    if (!accessToken) {
       setError("Please log in or create a customer account before placing an order.");
       return;
     }
 
     const payload = {
-      user_id: customerUserId,
       business_id: cart.business_id,
       service_date: serviceDate,
       slot_type: slotType,
@@ -135,7 +134,7 @@ export default function CartPage() {
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify(payload),
       });
 
@@ -154,7 +153,7 @@ export default function CartPage() {
     return <div className="card">Loading cart...</div>;
   }
 
-  if (!customerUserId) {
+  if (!accessToken) {
     return (
       <div className="card">
         <h1>Your cart</h1>
@@ -210,7 +209,7 @@ export default function CartPage() {
       <div className="card">
         <h2>Order details</h2>
         <div className="grid" style={{ gap: 12 }}>
-          {customerUserId ? (
+          {accessToken ? (
             <div className="card" style={{ background: "#f7fff9" }}>
               Ordering as <strong>{customerEmail}</strong>
             </div>

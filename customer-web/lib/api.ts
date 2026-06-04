@@ -14,13 +14,13 @@ export async function apiGet(path: string) {
   return res.json();
 }
 
-export async function apiPost(path: string, payload: any, userId?: string) {
+export async function apiPost(path: string, payload: any, accessToken?: string) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
-  if (userId) {
-    headers["X-User-Id"] = userId;
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
   }
 
   const res = await fetch(`${API_BASE_URL}${path}`, {

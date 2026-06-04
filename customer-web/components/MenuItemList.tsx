@@ -73,7 +73,7 @@ export default function MenuItemList({
   function addToCart(item: MenuItem) {
     setMessage("");
 
-    if (!getCustomerSession()?.user_id) {
+    if (!getCustomerSession()?.access_token) {
       setMessage("Please log in before adding items to your cart.");
       window.setTimeout(() => setMessage(""), 3000);
       return;

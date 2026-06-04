@@ -193,6 +193,11 @@ def merchant_dashboard(
     else:
         selected_months = [today.month]
     total_orders_for_date = db.query(Preorder).filter(Preorder.business_id == business.id, Preorder.service_date == selected_date).count()
+    accepted_orders_for_date = (
+        db.query(Preorder)
+        .filter(Preorder.business_id == business.id, Preorder.service_date == selected_date, Preorder.status == "accepted")
+        .count()
+    )
     fulfilled_orders_for_date = (
         db.query(Preorder)
         .filter(Preorder.business_id == business.id, Preorder.service_date == selected_date, Preorder.status == "fulfilled")
@@ -229,20 +234,76 @@ def merchant_dashboard(
         )
         .count()
     )
-    daily_query = (
+    fulfilled_requests_for_date = (
+        db.query(Proposal)
+        .join(CustomRequest, Proposal.request_id == CustomRequest.id)
+        .filter(
+            Proposal.business_id == business.id,
+            Proposal.status == "fulfilled",
+            CustomRequest.target_date == selected_date,
+        )
+        .count()
+    )
+    fulfilled_order_rows = (
         db.query(
             Preorder.service_date.label("service_date"),
-            func.count(Preorder.id).label("order_count"),
+            func.count(Preorder.id).label("fulfilled_orders"),
             func.coalesce(func.sum(Preorder.total_amount), 0).label("revenue"),
         )
         .filter(
             Preorder.business_id == business.id,
+            Preorder.status == "fulfilled",
             extract("year", Preorder.service_date) == selected_year,
         )
     )
     if selected_months:
-        daily_query = daily_query.filter(extract("month", Preorder.service_date).in_(selected_months))
-    daily_rows = daily_query.group_by(Preorder.service_date).order_by(Preorder.service_date.asc()).all()
+        fulfilled_order_rows = fulfilled_order_rows.filter(extract("month", Preorder.service_date).in_(selected_months))
+    fulfilled_order_rows = fulfilled_order_rows.group_by(Preorder.service_date).order_by(Preorder.service_date.asc()).all()
+
+    fulfilled_request_rows = (
+        db.query(
+            CustomRequest.target_date.label("service_date"),
+            func.count(Proposal.id).label("fulfilled_requests"),
+            func.coalesce(func.sum(Proposal.quote_amount), 0).label("revenue"),
+        )
+        .join(CustomRequest, Proposal.request_id == CustomRequest.id)
+        .filter(
+            Proposal.business_id == business.id,
+            Proposal.status == "fulfilled",
+            extract("year", CustomRequest.target_date) == selected_year,
+        )
+    )
+    if selected_months:
+        fulfilled_request_rows = fulfilled_request_rows.filter(extract("month", CustomRequest.target_date).in_(selected_months))
+    fulfilled_request_rows = fulfilled_request_rows.group_by(CustomRequest.target_date).order_by(CustomRequest.target_date.asc()).all()
+
+    daily_metrics_by_date = {}
+    for row in fulfilled_order_rows:
+        key = row.service_date
+        daily_metrics_by_date[key] = {
+            "date": _iso(row.service_date),
+            "fulfilled_orders": int(row.fulfilled_orders or 0),
+            "fulfilled_requests": 0,
+            "orders": int(row.fulfilled_orders or 0),
+            "revenue": _money(row.revenue),
+        }
+    for row in fulfilled_request_rows:
+        key = row.service_date
+        metrics = daily_metrics_by_date.setdefault(
+            key,
+            {
+                "date": _iso(row.service_date),
+                "fulfilled_orders": 0,
+                "fulfilled_requests": 0,
+                "orders": 0,
+                "revenue": 0.0,
+            },
+        )
+        fulfilled_requests = int(row.fulfilled_requests or 0)
+        metrics["fulfilled_requests"] = fulfilled_requests
+        metrics["orders"] += fulfilled_requests
+        metrics["revenue"] += _money(row.revenue)
+
     subscription = (
         db.query(Subscription)
         .filter(Subscription.business_id == business.id)
@@ -254,26 +315,23 @@ def merchant_dashboard(
         "selected_date": _iso(selected_date),
         "next_date": _iso(next_date),
         "total_orders_for_date": total_orders_for_date,
+        "accepted_orders_for_date": accepted_orders_for_date,
         "fulfilled_orders_for_date": fulfilled_orders_for_date,
         "pending_orders_for_date": pending_orders_for_date,
         "total_orders_next_day": total_orders_next_day,
         "total_orders_today": total_orders_for_date,
+        "accepted_orders_today": accepted_orders_for_date,
         "fulfilled_orders_today": fulfilled_orders_for_date,
         "pending_orders_today": pending_orders_for_date,
         "total_orders_tomorrow": total_orders_next_day,
         "open_requests": open_requests,
         "accepted_requests_for_date": accepted_requests_today,
         "accepted_requests_next_day": accepted_requests_next_day,
+        "fulfilled_requests_for_date": fulfilled_requests_for_date,
         "accepted_requests_today": accepted_requests_today,
         "accepted_requests_tomorrow": accepted_requests_next_day,
-        "daily_metrics": [
-            {
-                "date": _iso(row.service_date),
-                "orders": int(row.order_count or 0),
-                "revenue": _money(row.revenue),
-            }
-            for row in daily_rows
-        ],
+        "fulfilled_requests_today": fulfilled_requests_for_date,
+        "daily_metrics": [daily_metrics_by_date[key] for key in sorted(daily_metrics_by_date)],
         "metrics_months": selected_months,
         "metrics_year": selected_year,
         "verification_status": business.verification_status,
