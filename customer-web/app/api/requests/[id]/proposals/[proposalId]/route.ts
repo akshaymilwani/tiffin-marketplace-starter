@@ -8,9 +8,9 @@ export async function PUT(
   { params }: { params: { id: string; proposalId: string } }
 ) {
   const body = await request.json();
-  const userId = body.user_id;
-  if (!userId) {
-    return NextResponse.json({ detail: "user_id is required" }, { status: 400 });
+  const authorization = request.headers.get("authorization");
+  if (!authorization) {
+    return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
   }
 
   const backendRes = await fetch(
@@ -19,7 +19,7 @@ export async function PUT(
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": userId,
+        Authorization: authorization,
       },
       body: JSON.stringify({ status: body.status }),
       cache: "no-store",

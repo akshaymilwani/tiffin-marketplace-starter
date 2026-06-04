@@ -18,7 +18,7 @@ function nextWeekDateString() {
 
 export default function NewRequestPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const [items, setItems] = useState<RequestItem[]>([{ name: "", quantity: 1 }]);
   const [cuisineTag, setCuisineTag] = useState("Indian");
   const [targetDate, setTargetDate] = useState(nextWeekDateString());
@@ -31,7 +31,7 @@ export default function NewRequestPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setUserId(getCustomerSession()?.user_id || "");
+    setAccessToken(getCustomerSession()?.access_token || "");
   }, []);
 
   function updateItem(index: number, patch: Partial<RequestItem>) {
@@ -49,7 +49,7 @@ export default function NewRequestPage() {
       .map((item) => ({ name: item.name.trim(), quantity: Number(item.quantity || 0) }))
       .filter((item) => item.name && item.quantity > 0);
 
-    if (!userId) {
+    if (!accessToken) {
       setError("Please log in before creating a request.");
       return;
     }
@@ -80,8 +80,8 @@ export default function NewRequestPage() {
     try {
       const res = await fetch("/api/requests", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, payload }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.detail || "Failed to create request");
@@ -92,7 +92,7 @@ export default function NewRequestPage() {
     }
   }
 
-  if (!userId) {
+  if (!accessToken) {
     return (
       <div className="card">
         <h1>Create request</h1>

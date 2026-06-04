@@ -23,3 +23,6 @@ button { font: inherit; }
 .status-pill { display:inline-block; margin-top:6px; padding:4px 8px; border-radius:999px; background:#f0f0f0; font-size:13px; }
 .request-item-row { display:grid; grid-template-columns: 1fr 120px 90px; gap:12px; align-items:center; }
 @media (max-width: 700px) { .request-item-row { grid-template-columns: 1fr; } }
+.kitchen-filters { display:grid; grid-template-columns: 1fr 220px; gap:12px; align-items:end; }
+.review-form { display:grid; grid-template-columns: 160px 1fr auto; gap:10px; align-items:end; margin-top:12px; }
+@media (max-width: 700px) { .kitchen-filters, .review-form { grid-template-columns: 1fr; } }

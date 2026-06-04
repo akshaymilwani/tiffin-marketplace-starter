@@ -28,13 +28,16 @@ export default function RequestsPage() {
     async function loadRequests() {
       const session = getCustomerSession();
       setEmail(session?.email || "");
-      if (!session?.user_id) {
+      if (!session?.access_token) {
         setLoaded(true);
         return;
       }
 
       try {
-        const res = await fetch(`/api/requests?user_id=${encodeURIComponent(session.user_id)}`, { cache: "no-store" });
+        const res = await fetch("/api/requests", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: "no-store",
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || "Failed to load requests");
         setRequests(Array.isArray(data) ? data : []);

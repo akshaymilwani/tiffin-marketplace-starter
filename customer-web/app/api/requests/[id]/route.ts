@@ -7,13 +7,13 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const userId = request.nextUrl.searchParams.get("user_id");
-  if (!userId) {
-    return NextResponse.json({ detail: "user_id is required" }, { status: 400 });
+  const authorization = request.headers.get("authorization");
+  if (!authorization) {
+    return NextResponse.json({ detail: "Authentication required" }, { status: 401 });
   }
 
   const backendRes = await fetch(`${API_BASE_URL}/requests/${params.id}`, {
-    headers: { "X-User-Id": userId },
+    headers: { Authorization: authorization },
     cache: "no-store",
   });
 

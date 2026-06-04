@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { apiGet } from "../../lib/api";
+import KitchenSearch from "../../components/KitchenSearch";
 
 export default async function KitchensPage() {
   let kitchens = [] as any[];
@@ -22,24 +22,13 @@ export default async function KitchensPage() {
         </div>
       )}
 
-      <div className="grid grid-3">
-        {kitchens.length === 0 ? (
+      {kitchens.length === 0 ? (
+        <div className="grid grid-3">
           <div className="card">No public kitchens yet.</div>
-        ) : (
-          kitchens.map((kitchen) => (
-            <div className="card" key={kitchen.id}>
-              <h3>{kitchen.business_name}</h3>
-              <p className="muted">{kitchen.cuisine_type}</p>
-              <p className="muted">
-                Verification: {kitchen.verification_status}
-              </p>
-              <Link href={`/kitchens/${kitchen.slug}`} className="button">
-                View kitchen
-              </Link>
-            </div>
-          ))
-        )}
-      </div>
+        </div>
+      ) : (
+        <KitchenSearch kitchens={kitchens} />
+      )}
     </div>
   );
 }

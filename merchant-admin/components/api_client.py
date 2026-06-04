@@ -11,10 +11,10 @@ def _headers(user_id=None, skip_auth=False):
     if skip_auth:
         return headers
 
-    resolved_user_id = user_id or st.session_state.get("user_id")
+    access_token = st.session_state.get("access_token")
 
-    if resolved_user_id:
-        headers["X-User-Id"] = resolved_user_id
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
 
     return headers
 

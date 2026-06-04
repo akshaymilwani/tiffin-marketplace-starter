@@ -1,6 +1,9 @@
 from fastapi import Depends, Header, HTTPException
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.security import ALGORITHM
 from app.db.session import get_db
 from app.models.user import User
 
@@ -9,10 +12,20 @@ def db_dep(db: Session = Depends(get_db)) -> Session:
     return db
 
 
-def get_mock_user_id(x_user_id: str | None = Header(default=None)) -> str:
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="Missing X-User-Id header for starter auth")
-    return x_user_id
+def get_mock_user_id(authorization: str | None = Header(default=None)) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        subject = payload.get("sub")
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
+
+    if not subject:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return subject
 
 
 def get_current_user(

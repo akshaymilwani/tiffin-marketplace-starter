@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 import json
 
 class Settings(BaseSettings):
@@ -9,13 +9,25 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5432/tiffin_marketplace"
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8501"]
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "backend", "0.0.0.0"]
+    RATE_LIMIT_MAX_REQUESTS: int = 120
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
 
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", "ALLOWED_HOSTS", mode="before")
     @classmethod
-    def parse_origins(cls, v):
+    def parse_json_list(cls, v):
         if isinstance(v, str):
             return json.loads(v)
         return v
+
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.ENV.lower() != "development":
+            if self.SECRET_KEY == "change_me" or len(self.SECRET_KEY) < 32:
+                raise ValueError("Set a strong SECRET_KEY before running outside development")
+            if "*" in self.CORS_ORIGINS:
+                raise ValueError("CORS_ORIGINS cannot include '*' outside development")
+        return self
 
     model_config = SettingsConfigDict(env_file='.env', extra='ignore')
 
