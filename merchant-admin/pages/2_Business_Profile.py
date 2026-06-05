@@ -1,11 +1,9 @@
 import streamlit as st
 
-from components.auth import require_login
+from components.auth import require_merchant
 from components.api_client import api_get, api_post, api_put
 
-st.set_page_config(page_title="Business Profile", layout="wide")
-
-require_login()
+require_merchant()
 
 st.title("Business Profile")
 

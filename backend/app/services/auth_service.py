@@ -8,17 +8,12 @@ from app.schemas.auth import SignUpRequest, LoginRequest, PasswordUpdateRequest
 
 
 def signup(db: Session, payload: SignUpRequest):
-    if payload.role not in {"customer", "merchant", "admin"}:
-        raise HTTPException(status_code=400, detail="Role must be customer, merchant, or admin")
+    if payload.role not in {"customer", "merchant"}:
+        raise HTTPException(status_code=400, detail="Public signup only supports customer or merchant accounts")
 
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Unable to create account with these details")
-
-    if payload.role == "admin":
-        existing_admin = db.query(User).filter(User.role == "admin", User.is_active.is_(True)).first()
-        if existing_admin:
-            raise HTTPException(status_code=403, detail="An admin user already exists. Log in as admin to manage the portal.")
 
     user = User(
         full_name=payload.full_name,

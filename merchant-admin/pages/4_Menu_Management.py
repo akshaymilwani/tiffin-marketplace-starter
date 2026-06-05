@@ -3,13 +3,11 @@ from io import BytesIO
 import pandas as pd
 import streamlit as st
 
-from components.auth import require_login
+from components.auth import require_merchant
 from components.business_context import require_business
 from components.api_client import api_get, api_post, api_put
 
-st.set_page_config(page_title="Menu Management", layout="wide")
-
-require_login()
+require_merchant()
 business_id = require_business()
 
 st.title("Menu Management")

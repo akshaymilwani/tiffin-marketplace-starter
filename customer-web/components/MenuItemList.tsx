@@ -63,6 +63,7 @@ export default function MenuItemList({
 }) {
   const [cartCount, setCartCount] = useState(0);
   const [message, setMessage] = useState("");
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const cart = readCart();
@@ -70,8 +71,20 @@ export default function MenuItemList({
     setCartCount(count);
   }, []);
 
+  function selectedQuantity(itemId: string) {
+    return quantities[itemId] || 1;
+  }
+
+  function updateSelectedQuantity(itemId: string, quantity: number) {
+    if (!Number.isFinite(quantity)) return;
+
+    const nextQuantity = Math.min(99, Math.max(1, Math.floor(quantity)));
+    setQuantities((current) => ({ ...current, [itemId]: nextQuantity }));
+  }
+
   function addToCart(item: MenuItem) {
     setMessage("");
+    const quantity = selectedQuantity(item.id);
 
     if (!getCustomerSession()?.access_token) {
       setMessage("Please log in before adding items to your cart.");
@@ -102,14 +115,14 @@ export default function MenuItemList({
     const existingItem = cart.items.find((x) => x.menu_item_id === item.id);
 
     if (existingItem) {
-      existingItem.quantity += 1;
+      existingItem.quantity += quantity;
     } else {
       cart.items.push({
         menu_item_id: item.id,
         name: item.name,
         description: item.description,
         unit_price: Number(item.price || 0),
-        quantity: 1,
+        quantity,
       });
     }
 
@@ -117,7 +130,7 @@ export default function MenuItemList({
 
     const count = cart.items.reduce((sum, x) => sum + x.quantity, 0);
     setCartCount(count);
-    setMessage(`${item.name} added to cart.`);
+    setMessage(`${quantity} ${item.name} added to cart.`);
     window.setTimeout(() => setMessage(""), 2500);
   }
 
@@ -157,9 +170,35 @@ export default function MenuItemList({
             </p>
           </div>
 
-          <button className="button" type="button" onClick={() => addToCart(item)}>
-            Add to cart
-          </button>
+          <div className="menu-actions">
+            <div className="quantity-stepper" aria-label={`${item.name} quantity`}>
+              <button
+                type="button"
+                aria-label={`Decrease ${item.name} quantity`}
+                onClick={() => updateSelectedQuantity(item.id, selectedQuantity(item.id) - 1)}
+              >
+                -
+              </button>
+              <input
+                aria-label={`${item.name} quantity`}
+                min={1}
+                max={99}
+                type="number"
+                value={selectedQuantity(item.id)}
+                onChange={(event) => updateSelectedQuantity(item.id, Number(event.target.value))}
+              />
+              <button
+                type="button"
+                aria-label={`Increase ${item.name} quantity`}
+                onClick={() => updateSelectedQuantity(item.id, selectedQuantity(item.id) + 1)}
+              >
+                +
+              </button>
+            </div>
+            <button className="button" type="button" onClick={() => addToCart(item)}>
+              Add to cart
+            </button>
+          </div>
         </div>
       ))}
     </div>

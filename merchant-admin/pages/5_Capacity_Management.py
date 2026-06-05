@@ -1,11 +1,11 @@
 import streamlit as st
 
-from components.auth import require_login
+from components.auth import require_merchant
 from components.business_context import require_business
 from components.api_client import api_get, api_post
 
 st.title("Capacity Management")
-require_login()
+require_merchant()
 require_business()
 
 st.caption("Unconfigured lunch/dinner slots default to capacity 20. Saving capacity here overwrites that default for the selected date and slot.")

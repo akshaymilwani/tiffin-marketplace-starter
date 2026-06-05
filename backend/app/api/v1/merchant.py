@@ -195,7 +195,11 @@ def merchant_dashboard(
     total_orders_for_date = db.query(Preorder).filter(Preorder.business_id == business.id, Preorder.service_date == selected_date).count()
     accepted_orders_for_date = (
         db.query(Preorder)
-        .filter(Preorder.business_id == business.id, Preorder.service_date == selected_date, Preorder.status == "accepted")
+        .filter(
+            Preorder.business_id == business.id,
+            Preorder.service_date == selected_date,
+            Preorder.status.in_(["accepted", "fulfilled"]),
+        )
         .count()
     )
     fulfilled_orders_for_date = (
