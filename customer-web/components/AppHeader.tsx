@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearCustomerSession, getCustomerSession } from "../lib/customerAuth";
 
@@ -19,6 +20,7 @@ function readCartCount() {
 }
 
 export default function AppHeader() {
+  const router = useRouter();
   const [cartCount, setCartCount] = useState(0);
   const [email, setEmail] = useState("");
 
@@ -54,6 +56,8 @@ export default function AppHeader() {
             onClick={() => {
               clearCustomerSession();
               setEmail("");
+              setCartCount(0);
+              router.push("/");
             }}
           >
             Logout

@@ -4,10 +4,10 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 from components.api_client import api_get
-from components.auth import require_login
+from components.auth import require_merchant
 
 st.title("Dashboard")
-require_login()
+require_merchant()
 
 st.subheader("Merchant orders")
 today = date.today()
@@ -46,7 +46,7 @@ try:
         order_cols[0].metric("Total orders received", merchant["total_orders_for_date"])
         order_cols[1].metric("Accepted orders", merchant["accepted_orders_for_date"])
         order_cols[2].metric("Fulfilled orders", merchant["fulfilled_orders_for_date"])
-        order_cols[3].metric("Pending orders", merchant["pending_orders_for_date"])
+        order_cols[3].metric("Orders awaiting action", merchant["pending_orders_for_date"])
 
         request_cols = st.columns(4)
         request_cols[0].metric("Open Requests", merchant["open_requests"])

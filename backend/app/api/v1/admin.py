@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import db_dep, require_admin_user
 from app.models.business import Business
 from app.models.merchant_verification import MerchantVerification
+from app.models.preorder import Preorder
+from app.models.proposal import Proposal
 from app.models.subscription import Subscription
 from app.models.user import User
 
@@ -73,10 +75,41 @@ def admin_dashboard(db: Session = Depends(db_dep), admin_user: User = Depends(re
     pending_verifications = db.query(MerchantVerification).filter(MerchantVerification.decision == "pending").count()
     active_merchants = db.query(Business).filter(Business.public_listing_status == "visible").count()
     expired_subscriptions = db.query(Subscription).filter(Subscription.status == "expired").count()
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    merchants_added_last_30_days = db.query(Business).filter(Business.created_at >= thirty_days_ago).count()
+    total_merchants = db.query(Business).count()
+    total_orders = db.query(Preorder).count()
+
+    merchant_activity = []
+    businesses = db.query(Business).order_by(Business.business_name.asc()).all()
+    for business in businesses:
+        order_count = db.query(Preorder).filter(Preorder.business_id == business.id).count()
+        proposal_count = db.query(Proposal).filter(Proposal.business_id == business.id).count()
+        merchant_activity.append(
+            {
+                "business_id": str(business.id),
+                "business_name": business.business_name,
+                "city": business.city,
+                "verification_status": business.verification_status,
+                "public_listing_status": business.public_listing_status,
+                "orders": order_count,
+                "proposals": proposal_count,
+                "activity_count": order_count + proposal_count,
+            }
+        )
+
+    top_active_merchants = sorted(merchant_activity, key=lambda row: row["activity_count"], reverse=True)[:3]
+    least_active_merchants = sorted(merchant_activity, key=lambda row: (row["activity_count"], row["business_name"]))[:3]
+
     return {
         "pending_verifications": pending_verifications,
         "active_merchants": active_merchants,
         "expired_subscriptions": expired_subscriptions,
+        "merchants_added_last_30_days": merchants_added_last_30_days,
+        "total_merchants": total_merchants,
+        "total_orders": total_orders,
+        "top_active_merchants": top_active_merchants,
+        "least_active_merchants": least_active_merchants,
     }
 
 
